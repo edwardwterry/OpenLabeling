@@ -57,6 +57,7 @@ if TRACKER_TYPE == "DASIAMRPN":
 WINDOW_NAME    = 'OpenLabeling'
 TRACKBAR_IMG   = 'Image'
 TRACKBAR_CLASS = 'Class'
+TRACKBAR_TRACK = 'Track'
 
 annotation_formats = {'PASCAL_VOC' : '.xml', 'YOLO_darknet' : '.txt'}
 TRACKER_DIR = os.path.join(OUTPUT_DIR, '.tracker')
@@ -208,6 +209,11 @@ def set_class_index(x):
     text = 'Selected class {}/{} -> {}'.format(str(class_index), str(last_class_index), CLASS_LIST[class_index])
     display_text(text, 3000)
 
+def set_track_index(x):
+    global track_index
+    track_index = x
+    text = 'Selected track {}/{} -> {}'.format(str(track_index), str(last_track_index), track_index)
+    display_text(text, 1000)
 
 def draw_edges(tmp_img):
     blur = cv2.bilateralFilter(tmp_img, 3, 75, 75)
@@ -248,6 +254,22 @@ def yolo_format(class_index, point_1, point_2, width, height):
     items = map(str, [class_index, x_center, y_center, x_width, y_height])
     return ' '.join(items)
 
+def yolo_track_format(class_index, point_1, point_2, width, height, track):
+    # YOLO wants everything normalized
+    # Order: class x_center y_center x_width y_height
+    x_center = float((point_1[0] + point_2[0]) / (2.0 * width) )
+    y_center = float((point_1[1] + point_2[1]) / (2.0 * height))
+    x_width = float(abs(point_2[0] - point_1[0])) / width
+    y_height = float(abs(point_2[1] - point_1[1])) / height
+    items = map(str, [class_index, x_center, y_center, x_width, y_height, track])
+    return ' '.join(items)
+
+def yolo_to_tlbr(cx, cy, w, h):
+    t = cy - 0.5 * h
+    l = cx - 0.5 * w
+    b = cy + 0.5 * h
+    r = cx + 0.5 * w
+    return t, l, b, r
 
 def voc_format(class_name, point_1, point_2):
     # Order: class_name xmin ymin xmax ymax
@@ -547,6 +569,7 @@ def edit_bbox(obj_to_edit, action):
         class_index, xmin, ymin, xmax, ymax = map(int, obj_to_edit)
 
         for ann_path in get_annotation_paths(path, annotation_formats):
+            print ('ann path', ann_path)
             if '.txt' in ann_path:
                 # edit YOLO file
                 with open(ann_path, 'r') as old_file:
@@ -558,6 +581,7 @@ def edit_bbox(obj_to_edit, action):
 
                 with open(ann_path, 'w') as new_file:
                     for line in lines:
+                        print(line)
 
                         if i != ind:
                            new_file.write(line)
@@ -762,6 +786,10 @@ def save_bounding_box(annotation_paths, class_index, point_1, point_2, width, he
         elif '.xml' in ann_path:
             line = voc_format(CLASS_LIST[class_index], point_1, point_2)
             append_bb(ann_path, line, '.xml')
+
+def save_bounding_box_track(ann_path, class_index, point_1, point_2, width, height, track):
+    line = yolo_track_format(class_index, point_1, point_2, width, height, track)
+    append_bb(ann_path, line, '.txt')
 
 def is_frame_from_video(img_path):
     for video_name in VIDEO_NAME_DICT:
@@ -1038,6 +1066,9 @@ if __name__ == '__main__':
     #print(CLASS_LIST)
     last_class_index = len(CLASS_LIST) - 1
 
+    # track list
+    last_track_index = 30
+
     # Make the class colors the same each session
     # The colors are in BGR order because we're using OpenCV
     class_rgb = [
@@ -1063,8 +1094,12 @@ if __name__ == '__main__':
     if last_class_index != 0:
         cv2.createTrackbar(TRACKBAR_CLASS, WINDOW_NAME, 0, last_class_index, set_class_index)
 
+    # selected image
+    cv2.createTrackbar(TRACKBAR_TRACK, WINDOW_NAME, 0, last_track_index, set_track_index)
+
     # initialize
     set_img_index(0)
+    set_track_index(0)
     edges_on = False
 
     display_text('Welcome!\n Press [h] for help.', 4000)
@@ -1174,6 +1209,19 @@ if __name__ == '__main__':
                             class_index = obj[0]
                             color = class_rgb[class_index].tolist()
                             label_tracker.start_tracker(json_file_data, json_file_path, img_path, obj, color, annotation_formats)
+            elif pressed_key == ord('t'):
+                # open the relevant annotation text file
+                ann_path = get_annotation_path_track(img_path)
+                # for all boxes in the file
+                with open(ann_path, 'r') as old_file:
+                    lines = old_file.readlines()
+                    for line in lines:
+                        # convert to tlbr
+                        t, l, b, r = yolo_to_tlbr(line[1], )
+                        if pointInRect(mouse_x, mouse_y, x1_c, y1_c, x2_c, y2_c):
+                    # if point in box
+                        # copy the relevant line from annotation text file
+                        save_bounding_box_track(ann_path, class_index, point_1, point_2, width, height, track)
             # quit key listener
             elif pressed_key == ord('q'):
                 break
