@@ -581,8 +581,6 @@ def edit_bbox(obj_to_edit, action):
 
                 with open(ann_path, 'w') as new_file:
                     for line in lines:
-                        print(line)
-
                         if i != ind:
                            new_file.write(line)
 
@@ -1223,12 +1221,39 @@ if __name__ == '__main__':
                         vals = [float(x) for x in line.split(' ')]
                         vals[0] = int(vals[0])
                         t, l, b, r = yolo_to_tlbr(vals[1], vals[2], vals[3], vals[4])
+                        in_n_rects = 0
                         if pointInRect(mouse_x, mouse_y, l * width, t * height, r * width, b * height):
                             ann_path_track = get_annotation_path_track(img_path)
                             vals = [str(x) for x in vals]
                             vals.append(str(track_index))
                             vals = ' '.join(vals)
                             save_bounding_box_track(ann_path_track, vals)
+                            in_n_rects += 1
+                        if in_n_rects > 1:
+                            print('WARNING! MOUSE IN TWO BOXES!')
+            elif pressed_key == ord(' '):
+                if is_bbox_selected:
+                    dragBBox.handler_left_mouse_down(mouse_x, mouse_y, img_objects[selected_bbox])
+
+                if dragBBox.anchor_being_dragged is None:
+                    if point_1[0] == -1:
+                        if is_bbox_selected:
+                            if is_mouse_inside_delete_button():
+                                set_selected_bbox(True)
+                                obj_to_edit = img_objects[selected_bbox]
+                                edit_bbox(obj_to_edit, 'delete')
+                            is_bbox_selected = False
+                        else:
+                            # first click (start drawing a bounding box or delete an item)
+
+                            point_1 = (mouse_x, mouse_y)
+                    else:
+                        # minimal size for bounding box to avoid errors
+                        threshold = 5
+                        if abs(mouse_x - point_1[0]) > threshold or abs(mouse_y - point_1[1]) > threshold:
+                            # second click
+                            point_2 = (mouse_x, mouse_y)
+
             # quit key listener
             elif pressed_key == ord('q'):
                 break
