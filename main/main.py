@@ -760,6 +760,13 @@ def get_annotation_paths(img_path, annotation_formats):
     return annotation_paths
 
 
+def get_annotation_path_track(img_path):
+    new_path = os.path.join(OUTPUT_DIR, 'tracks')
+    new_path = os.path.join(new_path, os.path.basename(os.path.normpath(img_path))) #img_path.replace(INPUT_DIR, new_path, 1)
+    pre_path, img_ext = os.path.splitext(new_path)
+    new_path = new_path.replace(img_ext, '.txt', 1)
+    return new_path
+
 def create_PASCAL_VOC_xml(xml_path, abs_path, folder_name, image_name, img_height, img_width, depth):
     # By: Jatin Kumar Mandav
     annotation = ET.Element('annotation')
@@ -787,8 +794,7 @@ def save_bounding_box(annotation_paths, class_index, point_1, point_2, width, he
             line = voc_format(CLASS_LIST[class_index], point_1, point_2)
             append_bb(ann_path, line, '.xml')
 
-def save_bounding_box_track(ann_path, class_index, point_1, point_2, width, height, track):
-    line = yolo_track_format(class_index, point_1, point_2, width, height, track)
+def save_bounding_box_track(ann_path, line):
     append_bb(ann_path, line, '.txt')
 
 def is_frame_from_video(img_path):
@@ -1210,18 +1216,19 @@ if __name__ == '__main__':
                             color = class_rgb[class_index].tolist()
                             label_tracker.start_tracker(json_file_data, json_file_path, img_path, obj, color, annotation_formats)
             elif pressed_key == ord('t'):
-                # open the relevant annotation text file
-                ann_path = get_annotation_path_track(img_path)
-                # for all boxes in the file
+                ann_path = get_annotation_paths(img_path, {'YOLO_darknet': '.txt'})[0]
                 with open(ann_path, 'r') as old_file:
                     lines = old_file.readlines()
                     for line in lines:
-                        # convert to tlbr
-                        t, l, b, r = yolo_to_tlbr(line[1], )
-                        if pointInRect(mouse_x, mouse_y, x1_c, y1_c, x2_c, y2_c):
-                    # if point in box
-                        # copy the relevant line from annotation text file
-                        save_bounding_box_track(ann_path, class_index, point_1, point_2, width, height, track)
+                        vals = [float(x) for x in line.split(' ')]
+                        vals[0] = int(vals[0])
+                        t, l, b, r = yolo_to_tlbr(vals[1], vals[2], vals[3], vals[4])
+                        if pointInRect(mouse_x, mouse_y, l * width, t * height, r * width, b * height):
+                            ann_path_track = get_annotation_path_track(img_path)
+                            vals = [str(x) for x in vals]
+                            vals.append(str(track_index))
+                            vals = ' '.join(vals)
+                            save_bounding_box_track(ann_path_track, vals)
             # quit key listener
             elif pressed_key == ord('q'):
                 break
